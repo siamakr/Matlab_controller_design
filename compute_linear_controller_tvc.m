@@ -14,7 +14,7 @@ syms r2n_p1 r2n_p2 m Jx Jy Jz Jprop Jrw ltvc lrw g kmrw kmedf
 % ltvc = COM-to-TVC distance 
 % lrw = COM-to-RW distance 
 % km = rw motor constant (test)
-
+%dd
 
 
 %% Definitions
