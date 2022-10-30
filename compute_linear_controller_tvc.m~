@@ -333,7 +333,7 @@ R = [ 1/30^2   0       0       0          ; % dr
 
 %% Optimal Controller 
 % Compute "optimal" controller
-K_sys = lqr(sys, Q, R_att);
+ K = lqr(sys_red, Q, R);
 K_red = lqr(sys_red, Q, R);
 K_att = lqr(sys_att, Q_att, R_att);
 
@@ -349,18 +349,17 @@ K_att = lqr(sys_att, Q_att, R_att);
 %% Closed Loop System Calculation 
 % Calcuate closed loop system
 
-%reduced mode (8 states, 3 inputs)
-cl_sys = ss((A_sys - B_sys*K_sys), B_sys, C_sys, D_sys );
-sys_clfb = feedback( sys*K_sys, eye(8));
-
-%attitude only (6 states, 3 inputs)
+%
 cl_sys_att = ss((A_att - B_att*K_att), B_att, C_att, D_att );
 sys_clfb_att = feedback( sys_att*K_att, eye(6));
 
-%reduced mode (8 states, 4 inputs)
+
 cl_sys_red = ss((A_red - B_red*K_red), B_red, C_red, D_red );
 sys_clfb_red = feedback( sys_red*K_red, eye(8));
 
+%  cl_sys = ss((A_sys - B_sys*K), B_sys, C_sys, D_sys );
+% 
+%  sys_clfb_sys = feedback( sys*K, eye(8));
 
 %% Pole-Zero Mapping 
  figure(1)
@@ -372,25 +371,21 @@ sys_clfb_red = feedback( sys_red*K_red, eye(8));
  pzmap(sys_clfb_red,'o');
  [p_red,z_red] = pzmap(sys_clfb_red)
  grid on
+%  
+%   figure(3)
+%  pzmap(sys_clfb_sys,'o');
+%  [p_sys,z_sys] = pzmap(sys_clfb_sys)
+%  grid on
   
- figure(3)
- pzmap(sys_clfb,'o');
- [p_sys,z_sys] = pzmap(sys_clfb)
- grid on
- 
-%% LQR Gains 
-
- K_sys
  K_att
  K_red
  
- 
-%% Step Response 
 
+ 
  figure(4)
  opt = stepDataOptions; 
  opt.StepAmplitude = 3; 
- step(sys_clfb_att, sys_clfb_red, sys_clfb, opt, 5)
+ step(sys_clfb_att, sys_clfb_red, opt, 5)
  
 
 % 
