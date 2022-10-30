@@ -5,7 +5,7 @@ syms x y z vx vy vz p q u wx wy wz      % States
 syms Ft Fx Fy dp dr wtm wtrw 
 % Ft= Thrust (N) Fx, Fy =TVC Force dp,dr= pitch,roll angle, wtm = EDF motor
 % angular speed (rad/s), wtrw = Reaction Wheel angular speed (rad/s) 
-syms r2n_p1 r2n_p2 m Jx Jy Jz Jprop Jrw ltvc lrw g kmrw kmedf     
+syms r2n_p1 r2n_p2 m Jx Jy Jz Jprop Jrw ltvc lrw g kmrw kmedf trw    
 % r2n_p1 and r2n_p1 = polynomial regression coeff. 
 % m = mass 
 % Jx, Jy, Jz = Moments of Inertia 
@@ -72,7 +72,7 @@ fb = Rtb * transpose([0 0 Ft]);     %rotate the thrust-vector Ft to body frame
 
 %% Torques
 %torque of reaction-wheel 
-trw = kmrw * wtrw ;     %this is just a placeholder and of course wrong 
+%trw = kmrw * wtrw ;     %this is just a placeholder and of course wrong 
 
 
 %torque of EDF motor Prop 
@@ -102,7 +102,7 @@ X_red = [nw; wb; pw(3); vb(3)];         % Reduced state vector (only attitude an
 %X_roll = [nw(1); wb(1); pw(1); vb(1)];
 
 % Full Input vector (TVC + EDF + Reaction Wheel)
-U = [dp; dr; wtm; wtrw];
+U = [dp; dr; wtm; trw];
 
 % Attitude only input (TVC + EDF) 
 U_att = [dp; dr; wtm];
@@ -213,7 +213,7 @@ kmedf = .00001;
 kmrw = .010;
 
 % All input is not zero!
-dp=0; dr=0; wtrw = 0;
+dp=0; dr=0; trw = 0;
 %the rad/s value that represents hover thrust of m*g
 wtm = (m*g - r2n_p2)/r2n_p1; % rad/s
 
@@ -311,10 +311,15 @@ Q_att = Q(1:6,1:6);
 % Q(9,9) = [ 1/0.15^2 ]; % z
       
 % Max actuation angle of +-15 degress
-R = [ 1/20.46^2   0       0       0           ; % dr
-      0        1/20.46^2  0       0          ; % dp
-      0        0       1/.1^2  0           ; % wtm
-      0        0       0       1/.75^2     ]; % wtrw
+% R = [ 1/20.46^2   0       0       0           ; % dr
+%       0        1/20.46^2  0       0          ; % dp
+%       0        0       1/.1^2  0           ; % wtm
+%       0        0       0       1/.75^2     ]; % wtrw
+  
+R = [ 1/30^2   0       0       0           ; % dr
+      0        1/30^2  0       0          ; % dp
+      0        0       1/6600.1^2  0           ; % wtm
+      0        0       0       1/3^2     ]; % trw **
 
  R_att = R(1:3,1:3);
   % Max actuation angle of +-15 degress
@@ -370,16 +375,16 @@ sys_clfb_att = feedback( sys_att*K_att, eye(6));
 %  grid on
   
  K_att
- K_red 
+ K_red
+ 
 
  
  figure(4)
  opt = stepDataOptions; 
- opt.StepAmplitude = 1; 
- step(sys_clfb_att, sys_clfb_red, opt, .5)
+ opt.StepAmplitude = 3; 
+ step(sys_clfb_att, sys_clfb_red, opt, 5)
  
- figure(5)
-  step(sys_clfb_red, opt, .5)
+
 % 
 % Q_pos = [ 1/0.5^2  0         0        0        ;
 %           0         1/0.5^2  0        0        ;
