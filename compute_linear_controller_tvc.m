@@ -86,9 +86,9 @@ tprop = kmedf * wtm ;  %this is just a placeholder and of course wrong
 
 
 %Body-Torque matrix 
-tb = [ fb(1)*ltvc            ;
-      -fb(2)*ltvc            ;
-       tprop-trw];
+tb = [ fb(1)*ltvc;  %TVC torque induced about x-axis
+      -fb(2)*ltvc;  %TVC torque induced about y-axis
+       tprop-trw];  %tprop induced by edf motor, corrected by trw of reaction wheel
 
 %% States + Input Vectors 
 % State vectors used for derivation
@@ -105,7 +105,8 @@ X_red = [nw; wb; pw(3); vb(3)];         % Reduced state vector (only attitude an
 %X_roll = [nw(1); wb(1); pw(1); vb(1)];
 
 % Full Input vector (TVC + EDF + Reaction Wheel)
-U = [dp; dr; wtm; trw];     % pitch_deflection_angle; roll_deflection_angle; edf_angular_speed; reaction_wheel_torque
+U = [dp; dr; wtm; trw];     
+%[pitch_deflection_angle; roll_deflection_angle; edf_angular_speed;reaction_wheel_torque]
 
 % Attitude only input (TVC + EDF) 
 U_att = [dp; dr; wtm];
@@ -115,8 +116,6 @@ U_att = [dp; dr; wtm];
 
 % Roll 
 % U_roll = [wtm; wtrw];
-
-
 
 %% Rotational dynamics
 
@@ -189,6 +188,7 @@ B5 = jacobian(f_att, U_att);
 
 
 %% Constants + Linearization Point Def 
+
 % The A and B matrixes are now filled with partial derivatives, similar to
 % an taylor expansion to approximate a nonlinear function/ODE
 % We must insert the state- and input-values at the operating point
@@ -220,9 +220,8 @@ dp=0; dr=0; trw = 0;
 %the rad/s value that represents hover thrust of m*g
 wtm = (m*g - r2n_p2)/r2n_p1; % rad/s
 
-
-
 %% System Definition 
+
 % Now the A and B matrixes can be evaluted, yield the full linear model
 % around the hover point.
 A_sys = vpa(subs(A), 4);
@@ -256,7 +255,6 @@ D_att = zeros(6,3);
  B_att = double(B_att);
  C_att = double(C_att);
  D_att = double(D_att);
-
 
 % Horizontal model
 % A_hor = vpa(subs(A3),4);
@@ -298,57 +296,45 @@ sys_att = ss(A_att,B_att,C_att,D_att);
 
 %% Bryson's Rule. 
 % Max angle of 0.3 radians. Maximum angular rate of 5 rad/second
-Q = [ 1/.1^2     0       0        0      0      0      0        0       ;  % Roll
-      0        1/0.1^2   0        0      0      0      0        0       ;  % Pitch
+Q = [ 1/.1^2     0       0        0      0      0      0        0      ;  % Roll
+      0        1/0.1^2   0        0      0      0      0        0      ;  % Pitch
       0        0        1/1^2    0      0      0      0        0       ;  % Yaw
       0        0        0        1/1^2  0      0      0        0       ;  % omega_x
       0        0        0        0      1/1^2  0      0        0       ;  % omega_y
       0        0        0        0      0      1/1^2  0        0       ;  % omega_z
-      0        0        0        0      0      0      1/0.5^2    0       ;  % z
-      0        0        0        0      0      0      0        1/1^2     ]; % v_z
+      0        0        0        0      0      0      1/0.5^2    0     ;  % z
+      0        0        0        0      0      0      0        1/1^2  ];  % v_z
 
 Q_red = Q;  
 Q_att = Q(1:6,1:6);
-  
-% Integral action  
-% Q(9,9) = [ 1/0.15^2 ]; % z
+Q_sys = Q_red;          %not needed but makes things neater
       
 % Max actuation angle of +-15 degress
 % R = [ 1/20.46^2   0       0       0      ; % dr
 %       0        1/20.46^2  0       0      ; % dp
 %       0        0       1/.1^2  0         ; % wtm
 %       0        0       0       1/.75^2  ]; % wtrw
-  
+
+% Max actuation angle of +- 15 degrees 
 R = [ 1/30^2   0       0       0          ; % dr
       0        1/30^2  0       0          ; % dp
       0        0       1/4300.1^2  0      ; % wtm
       0        0       0       1/3^2     ]; % trw **
-
- R_att = R(1:3,1:3);
-  % Max actuation angle of +-15 degress
-% R_att = [ 1/3^2        0       0           ; % dr
-%             0        1/3^2     0           ; % dp
-%             0        0       1/.1^2       ]; % wtm
-
+R_red = R;              %reduced model R matrix 
+R_att = R(1:3,1:3);     %attitude only R matrix 
+R_sys = R_att;          %%not needed but makes things neater
 
 %% Optimal Controller 
+
 % Compute "optimal" controller
-K_sys = lqr(sys, Q, R_att);
-K_red = lqr(sys_red, Q, R);
+K_sys = lqr(sys, Q_sys, R_sys);
+K_red = lqr(sys_red, Q_red, R_red);
 K_att = lqr(sys_att, Q_att, R_att);
 
-% Compute integral limit matching the steady-state motor velocity
-% int_lim = wt/K_hov(5,9) + wt*0.005;
-% 
-% sys_d = c2d(sys_int, 0.008, 'zoh' );
-% 
-% K_lqrd = dlqr(sys_d.A, sys_d.B, Q, R);
-
-% matrix_to_cpp( K_hov )
 
 %% Closed Loop System Calculation 
-% Calcuate closed loop system
 
+% Calcuate closed loop system
 %reduced mode (8 states, 3 inputs)
 cl_sys = ss((A_sys - B_sys*K_sys), B_sys, C_sys, D_sys );
 sys_clfb = feedback( sys*K_sys, eye(8));
@@ -378,58 +364,21 @@ sys_clfb_red = feedback( sys_red*K_red, eye(8));
  [p_sys,z_sys] = pzmap(sys_clfb)
  grid on
  
-%% LQR Gains 
-
+ %display LQR gains on terminal 
  K_sys
  K_att
  K_red
  
+%% Analysis 
  
-%% Step Response 
+ % Display Gain Matricies for Arduino code 
+ sprintf('%d,  ',K_sys)
+ sprintf('%d,  ',K_red)
+ sprintf('%d,  ',K_att)
 
+ 
+% Step Response 
  figure(4)
- opt = stepDataOptions; 
- opt.StepAmplitude = 3; 
- step(sys_clfb_att, sys_clfb_red, sys_clfb, opt, 5)
- 
-
-% 
-% Q_pos = [ 1/0.5^2  0         0        0        ;
-%           0         1/0.5^2  0        0        ;
-%           0         0         1/2^2  0        ;
-%           0         0         0        1/2^2 ];
-% 
-% Q_hor = Q_pos;      
-%       
-% Q_pos(5:6,5:6) = [ 1/1^2  0
-%                    0        1/1^2];
-%      
-% R_pos = [ 1/0.05^2  0;
-%           0          1/0.05^2];
-% 
-% K_pos = lqr(sys_hint, Q_pos, R_pos);
-% K_hor = lqr(sys_hor, Q_hor, R_pos);
-% 
-% 
-% sys_cl_pos = feedback( sys_hor*K_hor, eye(4));
-% 
-% figure(2)
-% pzmap(sys_cl_pos);
-% [p2,z2] = pzmap(sys_cl_pos)
-% % grid on
-
-
-
-% sys_total = series( sys_cl_pos, sys_cl_pos )
-
-% matrix_to_cpp( K_pos )
-
-%% Symbolic Discretization
-
-% syms dt;
-% M = expm([A_sym, B_sym; zeros(5,12), zeros(5,5) ]*dt);
-% 
-% Ad = M(1:12, 1:12);
-% Bd = M(1:12, 13:17);
-
-
+ opt = stepDataOptions;                                 %create options object
+ opt.StepAmplitude = 3;                                 %set step amplitude 
+ step(sys_clfb_att, sys_clfb_red, sys_clfb, opt, 5)     %run all 3 clfbs on same graph

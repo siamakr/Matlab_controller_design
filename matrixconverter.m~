@@ -1,0 +1,6 @@
+function matrixconverter(k)
+ numrows = height(k);
+ numcol = width(k);
+ 
+sprintf('%d,', k(1:numcol-1)), sprintf('%d', k(numcol));
+
