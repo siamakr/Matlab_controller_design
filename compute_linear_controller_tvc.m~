@@ -2,7 +2,7 @@ clc
 clear
 
 syms x y z vx vy vz p q u wx wy wz      % States
-syms Ft Fx Fy dp dr wtm wtrw
+syms Ft Fx Fy dp dr wtm wtrw tx ty tz 
 % Ft= Thrust (N) Fx, Fy =TVC Force dp,dr= pitch,roll angle, wtm = EDF motor
 % angular speed (rad/s), wtrw = Reaction Wheel angular speed (rad/s) 
 syms r2n_p1 r2n_p2 m Jx Jy Jz Jprop Jrw ltvc lrw g kmrw kmedf trw    
@@ -67,7 +67,8 @@ J = [Jx 0  0  ;
 %Ft = r2n_p1*wtm + r2n_p2;   %total motor force produce by props 
 
 % Body forces
-fb = Rtb * transpose([0 0 Ft]);     %rotate the thrust-vector Ft into body frame 
+% fb = Rtb * transpose([ty/ltvc -tx/ltvc Ft]);     %rotate the thrust-vector Ft into body frame 
+fb = [ty/ltvc; -tx/ltvc; Ft];     %rotate the thrust-vector Ft into body frame 
 %where [0 0 Ft] is the thrust force in TVC frame. 
 
 
@@ -86,9 +87,11 @@ tprop = kmedf * Ft ;  %this is just a placeholder and of course wrong
 
 
 %Body-Torque matrix 
-tb = [ fb(1)*ltvc;  %TVC torque induced about x-axis
-      -fb(2)*ltvc;  %TVC torque induced about y-axis
-       tprop-trw];  %tprop induced by edf motor, corrected by trw of reaction wheel
+ tb = [ fb(1)*ltvc;  %TVC torque induced about x-axis
+       -fb(2)*ltvc;  %TVC torque induced about y-axis
+        tprop-trw];  %tprop induced by edf motor, corrected by trw of reaction wheel
+
+
 
 %% States + Input Vectors 
 % State vectors used for derivation
@@ -105,11 +108,11 @@ X_red = [nw; wb; pw(3); vb(3)];         % Reduced state vector (only attitude an
 %X_roll = [nw(1); wb(1); pw(1); vb(1)];
 
 % Full Input vector (TVC + EDF + Reaction Wheel)
-U = [dr; dp; Ft; trw];     
+U = [tx; ty; Ft; trw];     
 %[pitch_deflection_angle; roll_deflection_angle; edf_angular_speed;reaction_wheel_torque]
 
 % Attitude only input (TVC + EDF) 
-U_att = [dp;dr; Ft];
+U_att = [ty;tx; Ft];
 
 % Input vector for horizontal model
 % U_hor = [p; q];
@@ -216,7 +219,13 @@ kmedf = .0001;            %****this is not experimentally measured yet, Just mak
 %kmrw = .010;
 
 % All input is not zero!
-dp=0; dr=0; trw = 0;
+dp=0; 
+dr=0; 
+trw = 0;
+
+tx=0; 
+ty=0; 
+
 %the rad/s value that represents hover thrust of m*g
 %wtm = (m*g - r2n_p2)/r2n_p1; % rad/s
 Ft = m*g;
@@ -297,12 +306,12 @@ sys_att = ss(A_att,B_att,C_att,D_att);
 
 %% Bryson's Rule. 
 % Max angle of 0.3 radians. Maximum angular rate of 5 rad/second
-Q = [ .01    0       0        0      0      0      0        0      ;  % Roll
-      0        .01   0        0      0      0      0        0      ;  % Pitch
-      0        0        .01    0      0      0      0        0       ;  % Yaw
-      0        0        0        3  0      0      0        0       ;  % omega_x
-      0        0        0        0      3  0      0        0       ;  % omega_y
-      0        0        0        0      0      3  0        0       ;  % omega_z
+Q = [ 10    0       0        0      0      0      0        0      ;  % Roll
+      0        10   0        0      0      0      0        0      ;  % Pitch
+      0        0        .1    0      0      0      0        0       ;  % Yaw
+      0        0        0        1  0      0      0        0       ;  % omega_x
+      0        0        0        0      1  0      0        0       ;  % omega_y
+      0        0        0        0      0      .01  0        0       ;  % omega_z
       0        0        0        0      0      0      1    0     ;  % z
       0        0        0        0      0      0      0        1  ];  % v_z
 
@@ -322,9 +331,9 @@ R = [ 1/430^2   0       0       0          ; % dr
       0        0       18.91  0      ; % wtm
       0        0       0       1/.20^2     ]; % trw **
   
-  R_att = [ 25.9036         0               0      ; % dr
-                0        25.9036       0           ; % dp
-                0        0              25.9036     ]; % wtm
+  R_att = [ 20         0               0      ; % dr
+                0        20       0           ; % dp
+                0        0              1     ]; % wtm
 
 R_red = R;              %reduced model R matrix 
 % R_att = R(1:3,1:3);     %attitude only R matrix 
@@ -392,5 +401,9 @@ sys_clfb_red = feedback( sys_red*K_red, eye(8));
 % Step Response 
  figure(4)
  opt = stepDataOptions;                                 %create options object
- opt.StepAmplitude = 3;                                 %set step amplitude 
- step(sys_clfb_att,  opt, 2)     %run all 3 clfbs on same graph
+ opt.StepAmplitude = 1;                                 %set step amplitude 
+ step(sys_clfb_att,  opt, 5)     %run all 3 clfbs on same graph
+
+ figure(3)
+ X0 = [1; 1; 0; 0; 0; 0];
+ initial(cl_sys_att, X0, 20)
