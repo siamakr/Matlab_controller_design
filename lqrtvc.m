@@ -9,7 +9,7 @@ syms r2n_p1 r2n_p2 m Jx Jy Jz Jprop Jrw ltvc lrw g kmrw kmedf trw ledf
 % r2n_p1 and r2n_p1 = polynomial regression coeff. 
 % m = mass 
 % Jx, Jy, Jz = Moments of Inertia 
-% Jprop = moment of inertia of edf prop 
+% Jprop = moment of inertia of edf prop orma
 % Jrw = moment of inertial of reaction wheel 
 % ltvc = COM-to-TVC distance 
 % lrw = COM-to-RW distance 
@@ -68,13 +68,13 @@ J = [Jx 0  0  ;
 
 % Body forces
 % fb = Rtb * transpose([ty/ltvc -tx/ltvc Ft]);     %rotate the thrust-vector Ft into body frame 
-T = [tx/ltvc; -ty/ltvc; Ft];     %rotate the thrust-vector Ft into body frame 
-Tmag = sqrt(T(1,1)^2 + T(2,1)^2 + T(3,1)^2);
-%where [0 0 Ft] is the thrust force in TVC frame. 
- dr = asin(tx/(ltvc+ledf)*Ft);
- dp = asin(ty/(ltvc+ledf)*Ft);
-
-fb =  T; 
+% T = [tx/ltvc; -ty/ltvc; Ft];     %rotate the thrust-vector Ft into body frame 
+% Tmag = sqrt(T(1,1)^2 + T(2,1)^2 + T(3,1)^2);
+% %where [0 0 Ft] is the thrust force in TVC frame. 
+%  dr = asin(tx/(ltvc+ledf)*Ft);
+%  dp = asin(ty/(ltvc+ledf)*Ft);
+% 
+% fb =  T; 
 
 %% Torques
 %torque of reaction-wheel 
@@ -83,17 +83,24 @@ fb =  T;
 
 wtm = (Ft-r2n_p2)/r2n_p1;
 %torque of EDF motor Prop 
-tprop = kmedf * wtm ;  %this is just a placeholder and of course wrong 
+tprop = kmedf *Ft ;  %this is just a placeholder and of course wrong 
 %kmedf = transformation factor to convert wtm of EDF motor to the torque
 %induced, since the change in wtm occurs in descrete sequential steps, it
 %is possible to map the torque produced by props to angular speed, making
 %angular speed an analogue of motor current. 
 
 
+
+
 %Body-Torque matrix 
-  tb = [ Ft*sin(dp)*cos(dr)*(ltvc*cos(dp)+ledf);  %TVC torque induced about x-axis
-        -Ft*sin(dr)*(ltvc*cos(dr)+ledf);  %TVC torque induced about y-axis
-         tprop];  %tprop induced by edf motor, corrected by trw of reaction wheel
+%   tb = [ Ft*sin(dp)*cos(dr)*(ltvc*cos(dp)+ledf);  %TVC torque induced about x-axis
+%         -Ft*sin(dr)*(ltvc*cos(dr)+ledf);  %TVC torque induced about y-axis
+%          tprop];  %tprop induced by edf motor, corrected by trw of reaction wheel
+
+%fb = [-Ft*sin(dp); Ft* cos(dp)*sin(dp); Ft*cos(dp)*cos(dr) ];
+fb = [Ft* dr; -Ft* dp; Ft ];
+
+tb = [fb(2)*(ltvc+ledf*cos(dr)); fb(1)*(ltvc+ledf*cos(dp)); tprop-trw ];
 
 
 
@@ -112,11 +119,11 @@ X_red = [nw; wb; pw(3); vb(3)];         % Reduced state vector (only attitude an
 %X_roll = [nw(1); wb(1); pw(1); vb(1)];
 
 % Full Input vector (TVC + EDF + Reaction Wheel)
-U = [tx; ty; Ft; trw];     
+U = [dp; dr; Ft; trw];     
 %[pitch_deflection_angle; roll_deflection_angle; edf_angular_speed;reaction_wheel_torque]
 
 % Attitude only input (TVC + EDF) 
-U_att = [ty;tx; Ft];
+U_att = [dp; dr; Ft];
 
 % Input vector for horizontal model
 % U_hor = [p; q];
@@ -173,8 +180,8 @@ f_att = [ nw_dot     ;
 % Using the Jacobian method, the set of nonlinear system equations are
 % linearized around the hover point
 
-A = jacobian(f_red, X_red);
-B = jacobian(f_red, U_att);
+A = jacobian(f_att, X_att);
+B = jacobian(f_att, U);
 
 % Reduced model (only z-axis in position)
 A2 = jacobian(f_red, X_red);
@@ -211,25 +218,22 @@ pitchp2 = 1530.81204806643;
 rollp1 = -29.2198405328854;
 rollp2 = 1453.88991021228;
 m = 2.457;                      %kg
-Jx = 6.85563961956689;
-Jy = 7.08910783725713;
-Jz = 0.0120276855157049;
+Jx = 0.0058595;
+Jy = 0.0058595;
+Jz = 0.012238;                %Jz = 0.0120276855157049;
 Jprop = 0.000174454522116462;
 Jrw = 0.00174245619164574;
 ltvc = 0.1335;                  %COM to TVC (m)
 lrw = 0.09525;                  % COM to RW (m)    
 ledf = .100;
 g= 9.807;
-kmedf = .000000000044;            %****this is not experimentally measured yet, Just making guesses at the moment*******
+kmedf = .000044;            %****this is not experimentally measured yet, Just making guesses at the moment*******
 %kmrw = .010;
 
 % All input is not zero!
 dp=0; 
 dr=0; 
 trw = 0;
-
-tx=0; 
-ty=0; 
 
 %the rad/s value that represents hover thrust of m*g
 %wtm = (m*g - r2n_p2)/r2n_p1; % rad/s
@@ -241,8 +245,8 @@ Ft = m*g;
 % around the hover point.
 A_sys = vpa(subs(A), 4);
 B_sys = vpa(subs(B), 4);
-C_sys = eye(8);
-D_sys = zeros(8,3);
+C_sys = eye(6);
+D_sys = zeros(6,4);
 
 A_sys = double(A_sys);
 B_sys = double(B_sys);
@@ -309,60 +313,53 @@ sys_att = ss(A_att,B_att,C_att,D_att);
 
 %% Design controller
 
-q1 = .1; 
-q2 = .10;
-r1 = 30;
-r2 = 10;
+q1 = 80; 
+q2 = 7;
+q3 = 2;
+r1 = 35;
+r2 = 35;
+r3 = 5;
 
 %% Bryson's Rule. 
 % Max angle of 0.3 radians. Maximum angular rate of 5 rad/second
-Q = [ q1    0       0        0      0      0      0        0      ;  % Roll
-      0          q1   0        0      0      0      0        0      ;  % Pitch
-      0        0        q1    0      0      0      0        0       ;  % Yaw
-      0        0        0        q2  0      0      0        0       ;  % omega_x
-      0        0        0        0      q2  0      0        0       ;  % omega_y
-      0        0        0        0      0      q2  0        0       ;  % omega_z
-      0        0        0        0      0      0      1    0     ;  % z
-      0        0        0        0      0      0      0        1  ];  % v_z
+Q = [ q1       0        0           0       0       0       0       0       ;  % Roll
+      0          q1     0           0       0       0       0       0       ;  % Pitch
+      0        0        q1          0       0       0       0       0       ;  % Yaw
+      0        0        0           q2      0       0       0       0       ;  % omega_x
+      0        0        0           0       q2      0       0       0       ;  % omega_y
+      0        0        0           0       0       q2      0       0       ;  % omega_z
+      0        0        0           0       0       0       q3      0       ;  % z
+      0        0        0           0       0       0       0       q3      ];  % v_z
 
 Q_red = Q;  
 Q_att = Q(1:6,1:6);
-Q_sys = Q_red;          %not needed but makes things neater
+Q_sys = Q_att;          %not needed but makes things neater
       
-% Max actuation angle of +-15 degress
-% R = [ 1/20.46^2   0       0       0      ; % dr
-%       0        1/20.46^2  0       0      ; % dp
-%       0        0       1/.1^2  0         ; % wtm
-%       0        0       0       1/.75^2  ]; % wtrw
 
 % Max actuation angle of +- 15 degrees 
-R = [ 1/430^2   0       0       0          ; % dr
-      0        1/.130^2  0       0          ; % dp
-      0        0       18.91  0      ; % wtm
-      0        0       0       1/.20^2     ]; % trw **
+R = [ r1       0       0        0           ; % dr
+      0        r2      0        0           ; % dp
+      0        0       r3        0           ; % wtm
+      0        0       0       1           ]; % trw **
   
-  R_att = [ r1         0               0      ; % dr
-                0        r1       0           ; % dp
-                0        0              r2     ]; % wtm
-
 R_red = R;              %reduced model R matrix 
-% R_att = R(1:3,1:3);     %attitude only R matrix 
-R_sys = R_att;          %%not needed but makes things neater
+R_att = R(1:3,1:3);     %attitude only R matrix 
+R_sys = R;          %%not needed but makes things neater
 
 %% Optimal Controller 
 
 % Compute "optimal" controller
-
-K_red = lqr(sys_red, Q_red, R_red);
 K_att = lqr(sys_att, Q_att, R_att);
-K_sys = K_red;
+K_red = lqr(sys_red, Q_red, R_red);
+
+K_sys = lqr(sys, Q_sys, R_sys) ;
 
 %% Closed Loop System Calculation 
 
 % Calcuate closed loop system
-%reduced mode (8 states, 3 inputs)
-% cl_sys = ss((A_sys - B_sys*K_sys), B_sys, C_sys, D_sys );
-% sys_clfb = feedback( sys*K_sys, eye(8));
+%reduced mode (6 states, 4 inputs)
+ cl_sys = ss((A_sys - B_sys*K_sys), B_sys, C_sys, D_sys );
+ sys_clfb = feedback( sys*K_sys, eye(6));
 
 %attitude only (6 states, 3 inputs)
 cl_sys_att = ss((A_att - B_att*K_att), B_att, C_att, D_att );
@@ -384,14 +381,15 @@ sys_clfb_red = feedback( sys_red*K_red, eye(8));
  [p_red,z_red] = pzmap(sys_clfb_red)
  grid on
 %   
-%  figure(3)
-%  pzmap(sys_clfb,'o');
-%  [p_sys,z_sys] = pzmap(sys_clfb)
-%  grid on
+  figure(3)
+  pzmap(sys_clfb,'o');
+  [p_sys,z_sys] = pzmap(sys_clfb)
+  grid on
  
  %display LQR gains on terminal 
 %  K_sys
  K_att
+ K_sys
  K_red
  K_attr = zeros(3,6);
  K_attr(1:3,1:3) = K_att(1:3,4:6); 
@@ -403,7 +401,7 @@ sys_clfb_red = feedback( sys_red*K_red, eye(8));
 %% Analysis 
  
  % Display Gain Matricies for Arduino code 
-%  sprintf('%d,  ',K_sys)
+ % sprintf('%d,  ',K_sys)
  sprintf('%d,  ',K_red.')
  sprintf('%d,  ',K_att.')
 
@@ -411,9 +409,9 @@ sys_clfb_red = feedback( sys_red*K_red, eye(8));
 % Step Response 
  figure(4)
  opt = stepDataOptions;                                 %create options object
- opt.StepAmplitude = .2;                                 %set step amplitude 
- step(sys_clfb_att,  opt, 5)     %run all 3 clfbs on same graph
+ opt.StepAmplitude = 5*pi/180;                                 %set step amplitude 
+ step(sys_clfb_att,  opt, 3)     %run all 3 clfbs on same graph
 
- figure(3)
- X0 = [.2; .2; 0; 0; 0; 0];
- initial(cl_sys_att, X0, 10)
+ figure(5)
+ X0 = [.06; -.06; 0; 0; 0; 0];
+ initial(cl_sys_att, X0, 3)
