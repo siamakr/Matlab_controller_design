@@ -98,7 +98,7 @@ tprop = kmedf *Ft ;  %this is just a placeholder and of course wrong
 %          tprop];  %tprop induced by edf motor, corrected by trw of reaction wheel
 
 %fb = [-Ft*sin(dp); Ft* cos(dp)*sin(dp); Ft*cos(dp)*cos(dr) ];
-fb = [-Ft* sin(dr); -Ft*cos(dr)* sin(dp); Ft*cos(dp)*cos(dr)];
+fb = [Ft* sin(dr); -Ft*cos(dr)* sin(dp); Ft*cos(dp)*cos(dr)];
 
 tb = [fb(2)*(ltvc+ledf*cos(dr)); fb(1)*(ltvc+ledf*cos(dp)); tprop-trw ];
 
@@ -106,7 +106,7 @@ tb = [fb(2)*(ltvc+ledf*cos(dr)); fb(1)*(ltvc+ledf*cos(dp)); tprop-trw ];
 
 %% States + Input Vectors 
 % State vectors used for derivation
-nw = [p q u].';     % Attitude (world frame) 
+nw = [p q u].';     % Attitude (world frame)
 wb = [wx wy wz].';  % Angular velocity (body frame)
 pw = [x y z].';     % Position (world frame)
 vb = [vx vy vz].';  % Velocity (body frame)
@@ -313,11 +313,11 @@ sys_att = ss(A_att,B_att,C_att,D_att);
 
 %% Design controller
 
-q1 = 100; 
-q2 = 0.040;
+q1 = 80; 
+q2 = 7;
 q3 = 2;
-r1 = 14.79;
-r2 = 14.79;
+r1 = 35;
+r2 = 35;
 r3 = 5;
 
 %% Bryson's Rule. 
@@ -410,8 +410,8 @@ sys_clfb_red = feedback( sys_red*K_red, eye(8));
  figure(4)
  opt = stepDataOptions;                                 %create options object
  opt.StepAmplitude = 5*pi/180;                                 %set step amplitude 
- step(sys_clfb_att,sys_clfb,  opt, .5)     %run all 3 clfbs on same graph
+ step(sys_clfb_att,  opt, 3)     %run all 3 clfbs on same graph
 
  figure(5)
- X0 = [.08; -.08; 0; 3; 3; 0];
- initial(cl_sys_att, X0, .5)
+ X0 = [.06; -.06; 0; 0; 0; 0];
+ initial(cl_sys_att, X0, 3)
