@@ -208,7 +208,7 @@ B5 = jacobian(f_att, U_att);
 % We must insert the state- and input-values at the operating point
 
 % All the states is zero at the hover point
-x = 0; y = 0; z = 0; vx = 0; vy = 0; vz = 0; p = 0; q = 0; u = 0; wx = 0; wy = 0; wz = 0;
+x = 0; y = 0; z = 1; vx = 0; vy = 0; vz = 0; p = 0; q = 0; u = 0; wx = 0; wy = 0; wz = 0;
 
 % vehicle Constants
 r2n_p1 = 0.018566536813619;
@@ -221,7 +221,7 @@ m = 2.457;                      %kg
 Jx = 0.0058595;
 Jy = 0.0058595;
 Jz = 0.012238;                %Jz = 0.0120276855157049;
-Jprop = 0.000174454522116462;
+Jprop = 0.0000174454522116462;
 Jrw = 0.00174245619164574;
 ltvc = 0.1335;                  %COM to TVC (m)
 lrw = 0.09525;                  % COM to RW (m)    
@@ -314,11 +314,13 @@ sys_att = ss(A_att,B_att,C_att,D_att);
 %% Design controller
 
 q1 = 100; 
-q2 = 0.040;
-q3 = 2;
+q2 = 0.080;
+q3 = 5;
+q4 = 1;
 r1 = 14.79;
 r2 = 14.79;
-r3 = 5;
+r3 = .008;
+r4 = 4;
 
 %% Bryson's Rule. 
 % Max angle of 0.3 radians. Maximum angular rate of 5 rad/second
@@ -329,7 +331,7 @@ Q = [ q1       0        0           0       0       0       0       0       ;  %
       0        0        0           0       q2      0       0       0       ;  % omega_y
       0        0        0           0       0       q2      0       0       ;  % omega_z
       0        0        0           0       0       0       q3      0       ;  % z
-      0        0        0           0       0       0       0       q3      ];  % v_z
+      0        0        0           0       0       0       0       q4      ];  % v_z
 
 Q_red = Q;  
 Q_att = Q(1:6,1:6);
@@ -339,8 +341,8 @@ Q_sys = Q_att;          %not needed but makes things neater
 % Max actuation angle of +- 15 degrees 
 R = [ r1       0       0        0           ; % dr
       0        r2      0        0           ; % dp
-      0        0       r3        0           ; % wtm
-      0        0       0       1           ]; % trw **
+      0        0       r3        0           ; % trw
+      0        0       0       r4           ]; % Ftm **
   
 R_red = R;              %reduced model R matrix 
 R_att = R(1:3,1:3);     %attitude only R matrix 
